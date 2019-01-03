@@ -64,7 +64,7 @@ impl JSEmulator {
     }
 
     pub fn render(&self) -> Vec<u8> {
-        unimplemented!()
+        self.emulator.bgr_pixels().into_iter().map(|&b| b).collect()
     }
 
     pub fn input_keycode(&mut self, key: i32, is_down: bool) {
