@@ -1,8 +1,12 @@
 import * as wasm from "webnes";
 
 const CPU_CLOCK_HZ = (1.79 * 1e6)
-const CPU_INTERVAL = (1 / CPU_CLOCK_HZ) * 1000;
+const CPU_INTERVAL = 11;
 const REFRESH_INTERVAL = 10;
+
+class EmulatorContext {
+
+}
 
 function onFileUpload(event) {
     console.log('onFileUploaded', event);
@@ -36,14 +40,21 @@ function startPeripherals() {
 }
 
 function stepCPURec() {
-    stepCPU();
-    setTimeout(stepCPURec, 1);
+    setInterval(() => stepCPU(CPU_INTERVAL), CPU_INTERVAL);
 }
 
 
-function stepCPU() {
-    for (let i = 0; i < CPU_CLOCK_HZ / 30; i++) {
-        emulator.step();
+function stepCPU(ms) {
+    const CYCLES = 5000;
+
+    let start = performance.now();
+
+    let cyclesPerLoop = CYCLES;
+
+    while (performance.now() - start < ms) {
+        for (let i = 0; i < cyclesPerLoop; i++) {
+            emulator.step();
+        }
     }
 }
 
