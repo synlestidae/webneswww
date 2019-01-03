@@ -2,7 +2,7 @@ import * as wasm from "webnes";
 
 const CPU_CLOCK_HZ = (1.79 * 1e6)
 const CPU_INTERVAL = (1 / CPU_CLOCK_HZ) * 1000;
-const REFRESH_INTERVAL = 20;
+const REFRESH_INTERVAL = 10;
 
 function onFileUpload(event) {
     console.log('onFileUploaded', event);
@@ -31,12 +31,18 @@ function init() {
 
 function startPeripherals() {
     let canvas = getCanvas();
-    setInterval(() => stepCPU(), 9.9);
     setInterval(() => window.emulator && render(), REFRESH_INTERVAL);
+    stepCPURec();
 }
 
+function stepCPURec() {
+    stepCPU();
+    setTimeout(stepCPURec, 1);
+}
+
+
 function stepCPU() {
-    for (let i = 0; i < CPU_CLOCK_HZ / 100; i++) {
+    for (let i = 0; i < CPU_CLOCK_HZ / 30; i++) {
         emulator.step();
     }
 }
@@ -71,7 +77,7 @@ function render() {
         context.fillStyle = `rgb(${r}, ${g}, ${b})`;
 
         let x = p % 256;
-        let y = Math.floor(p / 240);
+        let y = Math.floor(p / 256);
 
         context.fillRect(x * 3, y * 3, 3, 3);
     }
