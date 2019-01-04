@@ -2,7 +2,7 @@ import * as wasm from "webnes";
 
 const CPU_CLOCK_HZ = (1.79 * 1e6)
 
-const CPU_INTERVAL = 30;
+const CPU_INTERVAL = 200;
 
 const REFRESH_INTERVAL = 10;
 
@@ -12,10 +12,11 @@ class EmulatorContext {
     constructor(canvas) {
         this.cycles = 0;
         this.cpuInterval = CPU_INTERVAL;
-        this.cyclesPerInterval = CYCLES_PER_INTERVAL;
+        this.msPerInterval = CPU_INTERVAL;
         this.emulator = null;
         this.canvas = canvas;
         this.actualHZ = 0;
+        this.lastCheck = performance.now();
     }
 
     loadROM(fileReader) {
@@ -24,54 +25,41 @@ class EmulatorContext {
         this.emulator = new wasm.JSEmulator(array);
     }
 
-    startIntervals(cpuInterval) {
-        clearInterval(this.cpuIntervalId);
-        clearInterval(this.renderIntervalId);
-        clearInterval(this.cpuHzId);
-
-        this.cpuIntervalId = setInterval(() => this.cycleCPUTargetHZ(cpuInterval), cpuInterval);
+    startIntervals() {
+        this.cpuIntervalId = setInterval(() => this.cycleCPUTargetHZ(CPU_INTERVAL), CPU_INTERVAL);
         this.renderIntervalId = setInterval(() => this.render(), REFRESH_INTERVAL);
 
-        this.cpuHzId = setInterval(() => document.getElementById('cpu-hz').innerText = `${this.actualHZ} Hz`, REFRESH_INTERVAL * 5);
+        setInterval(() => document.getElementById('cpu-hz').innerText = `${this.actualHZ} Hz`, REFRESH_INTERVAL * 15);
     }
 
     cycleCPUTargetHZ(ms) {
-        let ms = this.cpuInterval;
+        this.cycleCPU(this.msPerInterval);
 
-        this.cycleCPU(ms);
+        let now = performance.now();
 
-        let target = CPU_CLOCK_HZ / (1000 / ms);
-        let actual = 1000 * (this.cycles / ms);
-
-        if (Math.abs(target / actual) < 0.9 || Math.abs(target / actual) > 1.1) {
-            let cycles = () * CPU_CLOCK_HZ;
-            startIntervals()
+        if (now - this.lastCheck < 300) {
+            return;
         }
 
-        /*let now = performance.now();
+        let targetHZ = CPU_CLOCK_HZ;
 
-        let diff = now - this.lastCheck;
-        let actualHZ = 1000 * (this.cycles / diff);
-        let target = CPU_CLOCK_HZ * (ms / 1000);
+        let actualHZ = this.cycles / ((now - this.lastCheck) / 1000);
 
+        if ((actualHZ / targetHZ) < 0.9 || (actualHZ / targetHZ) > 1.1) {
+            this.msPerInterval = (targetHZ / actualHZ) * ms;
+        }
+
+        this.lastCheck = now;
         this.actualHZ = actualHZ;
-
-        if (Math.abs(actualHZ - CPU_CLOCK_HZ) > (CPU_CLOCK_HZ / 10)) {
-            // set the interval based on the target
-            //
-        }
-        */
+        this.cycles = 0;
     }
 
     cycleCPU(ms) {
-        const CYCLES_BEFORE_CHECK = 500;
-
+        const CYCLES_BEFORE_CHECK = 30;
         let start = performance.now();
 
-        let i = 0;
-
         while (performance.now() - start < ms) {
-            for (; i < CYCLES_BEFORE_CHECK; i++) {
+            for (let i = 0; i < CYCLES_BEFORE_CHECK; i++) {
                 this.emulator.step();
                 this.cycles++;
             }
