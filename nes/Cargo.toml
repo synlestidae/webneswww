@@ -1,0 +1,17 @@
+[package]
+
+name = "nes"
+version = "0.1.0"
+authors = [ "pcwalton@mimiga.net" ]
+
+[lib]
+name = "nes"
+
+[dependencies]
+lazy_static = "0.1.15"
+
+[dependencies.web-sys]
+version = "0.3"
+features = [
+  "console",
+]
