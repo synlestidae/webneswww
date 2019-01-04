@@ -1,14 +1,14 @@
-import * as wasm from "webnes";
+import * as wasm from "../pkg/webnes";
 
-const CPU_CLOCK_HZ = (1.79 * 1e6)
+const CPU_CLOCK_HZ = (2.66 * 1e6)
 
-const CPU_INTERVAL = 200;
+const CPU_INTERVAL = 20;
 
-const REFRESH_INTERVAL = 10;
+const REFRESH_INTERVAL = 1;
 
 const CYCLES_PER_INTERVAL = CPU_CLOCK_HZ / 100;
 
-class EmulatorContext {
+export class EmulatorContext {
     constructor(canvas) {
         this.cycles = 0;
         this.cpuInterval = CPU_INTERVAL;
@@ -23,47 +23,25 @@ class EmulatorContext {
         let array = new Uint8Array(fileReader.result);
 
         this.emulator = new wasm.JSEmulator(array);
+
+        console.log('this', this);
     }
 
     startIntervals() {
         this.cpuIntervalId = setInterval(() => this.cycleCPUTargetHZ(CPU_INTERVAL), CPU_INTERVAL);
         this.renderIntervalId = setInterval(() => this.render(), REFRESH_INTERVAL);
-
-        setInterval(() => document.getElementById('cpu-hz').innerText = `${this.actualHZ} Hz`, REFRESH_INTERVAL * 15);
     }
 
     cycleCPUTargetHZ(ms) {
-        this.cycleCPU(this.msPerInterval);
-
-        let now = performance.now();
-
-        if (now - this.lastCheck < 300) {
-            return;
-        }
-
-        let targetHZ = CPU_CLOCK_HZ;
-
-        let actualHZ = this.cycles / ((now - this.lastCheck) / 1000);
-
-        if ((actualHZ / targetHZ) < 0.9 || (actualHZ / targetHZ) > 1.1) {
-            this.msPerInterval = (targetHZ / actualHZ) * ms;
-        }
-
-        this.lastCheck = now;
-        this.actualHZ = actualHZ;
-        this.cycles = 0;
+        let n = 1000 / ms;
+        this.cycleCPU(CPU_CLOCK_HZ / n)
     }
 
-    cycleCPU(ms) {
-        const CYCLES_BEFORE_CHECK = 30;
-        let start = performance.now();
-
-        while (performance.now() - start < ms) {
-            for (let i = 0; i < CYCLES_BEFORE_CHECK; i++) {
-                this.emulator.step();
-                this.cycles++;
-            }
+    cycleCPU(cycles) {
+        for (let i = 0; i < cycles; i++) {
+            this.emulator.step();
         }
+        this.cycles++;
     }
 
     keyDown(keyCode) {
@@ -97,6 +75,9 @@ class EmulatorContext {
 
             context.fillRect(x * 3, y * 3, 3, 3);
         }
+
+        document.getElementById('cpu-hz').innerText = `${this.actualHZ} Hz`;
+        document.getElementById('fps').innerText = `${this.emulator.get_fps()} FPS`;
     }
 
     dispose() {
