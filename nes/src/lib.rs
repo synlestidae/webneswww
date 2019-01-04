@@ -5,6 +5,9 @@
 #[macro_use]
 extern crate lazy_static;
 
+#[cfg(target_arch = "wasm32")]
+extern crate js_sys;
+
 // NB: This must be first to pick up the macro definitions. What a botch.
 #[macro_use]
 pub mod util;

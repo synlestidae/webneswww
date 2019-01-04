@@ -1,8 +1,8 @@
 import * as wasm from "../pkg/webnes";
 
-const CPU_CLOCK_HZ = (2.66 * 1e6)
+const CPU_CLOCK_HZ = (1.78 * 1e6)
 
-const CPU_INTERVAL = 20;
+const CPU_INTERVAL = 30;
 
 const REFRESH_INTERVAL = 1;
 
@@ -12,11 +12,8 @@ export class EmulatorContext {
     constructor(canvas) {
         this.cycles = 0;
         this.cpuInterval = CPU_INTERVAL;
-        this.msPerInterval = CPU_INTERVAL;
         this.emulator = null;
         this.canvas = canvas;
-        this.actualHZ = 0;
-        this.lastCheck = performance.now();
     }
 
     loadROM(fileReader) {
@@ -28,20 +25,29 @@ export class EmulatorContext {
     }
 
     startIntervals() {
-        this.cpuIntervalId = setInterval(() => this.cycleCPUTargetHZ(CPU_INTERVAL), CPU_INTERVAL);
-        this.renderIntervalId = setInterval(() => this.render(), REFRESH_INTERVAL);
+        this.cpuIntervalId = setInterval(() => this.cycleCPUTargetHZ(this.cpuInterval), this.cpuInterval);
+        setInterval(() => document.getElementById('cpu-hz').innerText = `${this.actualHZ} Hz`, 3000);
+        //this.renderIntervalId = setInterval(() => this.render(), REFRESH_INTERVAL);
     }
 
     cycleCPUTargetHZ(ms) {
         let n = 1000 / ms;
+
+        if (this.cpuStartedAt == null)
+            this.cpuStartedAt = performance.now();
+
         this.cycleCPU(CPU_CLOCK_HZ / n)
     }
 
     cycleCPU(cycles) {
+        let shouldRender = false;
         for (let i = 0; i < cycles; i++) {
             this.emulator.step();
+            this.cycles++;
+            shouldRender = this.emulator.check_new_frame();
         }
-        this.cycles++;
+
+        this.render();
     }
 
     keyDown(keyCode) {
@@ -76,13 +82,19 @@ export class EmulatorContext {
             context.fillRect(x * 3, y * 3, 3, 3);
         }
 
-        document.getElementById('cpu-hz').innerText = `${this.actualHZ} Hz`;
         document.getElementById('fps').innerText = `${this.emulator.get_fps()} FPS`;
     }
 
     dispose() {
        clearInterval(this.cpuIntervalId);
        clearInterval(this.renderIntervalId);
+    }
+
+    get actualHZ() {
+        let hz = 1000 * (this.cycles / (performance.now() - this.cpuStartedAt));
+        this.cpuStartedAt = null;
+        this.cycles = 0;
+        return hz;
     }
 }
 
@@ -105,11 +117,18 @@ function init() {
 }
 
 function onKeyDown(e) {
+    console.log('Key!', e.keyCode, e);
     emulator && emulator.keyDown(e.keyCode, true);
+    emulator && emulator.cycleCPU(1000);
 }
 
 function onKeyUp(e) {
-    emulator && emulator.keyUp(e.keyCode, false);
+    console.log('Bee!', e.keyCode, e);
+    if (emulator) {
+        emulator.keyUp(e.keyCode, false);
+        emulator.cycleCPU(1000);
+
+    }
 }
 
 window.onkeydown = onKeyDown;

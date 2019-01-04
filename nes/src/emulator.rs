@@ -9,7 +9,9 @@ pub struct Emulator {
     cpu: Cpu<MemMap>,
     gfx: Gfx,
     last_time: f64,
-    frames: usize
+    frames: usize,
+    pub new_frame: bool,
+    pub fps: usize
 }
 
 impl Emulator {
@@ -22,7 +24,9 @@ impl Emulator {
             cpu: cpu,
             gfx: gfx,
             last_time: 0.0,
-            frames: 0
+            frames: 0,
+            fps: 0,
+            new_frame: false 
         }
     }
 
@@ -41,10 +45,23 @@ impl Emulator {
         if ppu_result.new_frame {
             self.gfx.tick();
             self.gfx.composite(&mut *self.cpu.mem.ppu.screen);
-            record_fps(&mut self.last_time, &mut self.frames);
+            self.record_fps();
             self.cpu.mem.apu.play_channels();
+            self.new_frame = true;
         }
     }
+
+    fn record_fps(&mut self) {
+        let now = time::precise_time_s();
+        if now >= self.last_time + 1f64 {
+            self.fps = self.frames;
+            self.frames = 0;
+            self.last_time = now;
+        } else {
+            self.frames += 1;
+        }
+    }
+
 
     pub fn input(&mut self, ev: &InputEvent) -> InputResult {
         let gamepad = &mut self.cpu.mem.input.gamepad_0;
@@ -66,21 +83,12 @@ impl Emulator {
         InputResult::Continue
     }
 
+    pub fn get_fps(&self) -> usize {
+        self.fps
+    }
+
     pub fn bgr_pixels(&self) -> Box<[u8; 184320]> {
        self.cpu.mem.ppu.screen.clone() 
-    }
-}
-
-fn record_fps(last_time: &mut f64, frames: &mut usize) {
-    if cfg!(debug) {
-        let now = time::precise_time_s();
-        if now >= *last_time + 1f64 {
-            println!("{} FPS", *frames);
-            *frames = 0;
-            *last_time = now;
-        } else {
-            *frames += 1;
-        }
     }
 }
 

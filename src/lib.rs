@@ -83,4 +83,16 @@ impl JSEmulator {
         self.emulator.input(&InputEvent { event_type: event_type, active: is_down });
     }
 
+    pub fn get_fps(&self) -> usize {
+        self.emulator.get_fps()
+    }
+
+    pub fn check_new_frame(&mut self) -> bool {
+        if self.emulator.new_frame { 
+            self.emulator.new_frame = false;
+            return true;
+        }
+        false
+    }
+
 }
