@@ -2,9 +2,9 @@ import * as wasm from "../pkg/webnes";
 
 const CPU_CLOCK_HZ = (1.78 * 1e6)
 
-const CPU_INTERVAL = 30;
+const CPU_INTERVAL = 1000 / 60;
 
-const REFRESH_INTERVAL = 1;
+const REFRESH_INTERVAL = 16;
 
 const CYCLES_PER_INTERVAL = CPU_CLOCK_HZ / 100;
 
@@ -20,13 +20,15 @@ export class EmulatorContext {
         let array = new Uint8Array(fileReader.result);
 
         this.emulator = new wasm.JSEmulator(array);
+        this.renderTime = performance.now();
 
         console.log('this', this);
     }
 
     startIntervals() {
         this.cpuIntervalId = setInterval(() => this.cycleCPUTargetHZ(this.cpuInterval), this.cpuInterval);
-        setInterval(() => document.getElementById('cpu-hz').innerText = `${this.actualHZ} Hz`, 3000);
+        setInterval(() => document.getElementById('cpu-hz').innerText = `${this.actualHZ} Hz`, 6000);
+        setInterval(() => this.render(), 1000 / 60);
         //this.renderIntervalId = setInterval(() => this.render(), REFRESH_INTERVAL);
     }
 
@@ -40,14 +42,12 @@ export class EmulatorContext {
     }
 
     cycleCPU(cycles) {
-        let shouldRender = false;
         for (let i = 0; i < cycles; i++) {
             this.emulator.step();
             this.cycles++;
-            shouldRender = this.emulator.check_new_frame();
         }
 
-        this.render();
+        //this.render();
     }
 
     keyDown(keyCode) {
@@ -59,6 +59,7 @@ export class EmulatorContext {
     }
 
     render() {
+
         const NUM_PIXELS = 184320;
 
         var bytes = this.emulator.render();
@@ -82,6 +83,16 @@ export class EmulatorContext {
             context.fillRect(x * 3, y * 3, 3, 3);
         }
 
+        this.renderCount = Number(this.renderCount) + 1;
+
+        let diff = performance.now() - this.renderTime;
+
+        if (diff >= 2500) {
+            document.getElementById('refresh-rate').innerText = `${1000 * (this.renderCount / diff)} RF`;
+            this.renderCount = 0;
+            this.renderTime = performance.now();
+        }
+
         document.getElementById('fps').innerText = `${this.emulator.get_fps()} FPS`;
     }
 
@@ -92,7 +103,7 @@ export class EmulatorContext {
 
     get actualHZ() {
         let hz = 1000 * (this.cycles / (performance.now() - this.cpuStartedAt));
-        this.cpuStartedAt = null;
+        this.cpuStartedAt = performance.now();
         this.cycles = 0;
         return hz;
     }
