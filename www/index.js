@@ -1,8 +1,8 @@
 import * as wasm from "../pkg/webnes";
 
-const CPU_CLOCK_HZ = (1.78 * 1e6)
+const CPU_CLOCK_HZ = (0.88 * 1e6)
 
-const CPU_INTERVAL = 1000 / 60;
+const CPU_INTERVAL = 1000 / 10;
 
 const REFRESH_INTERVAL = 16;
 
@@ -11,9 +11,15 @@ const CYCLES_PER_INTERVAL = CPU_CLOCK_HZ / 100;
 export class EmulatorContext {
     constructor(canvas) {
         this.cycles = 0;
+        this.lastBytes = [];
         this.cpuInterval = CPU_INTERVAL;
         this.emulator = null;
         this.canvas = canvas;
+
+        canvas.width = 256 * 3;
+        canvas.height = 240 * 3;
+
+        this.bufferCanvas = document.createElement('canvas');
     }
 
     loadROM(fileReader) {
@@ -28,8 +34,7 @@ export class EmulatorContext {
     startIntervals() {
         this.cpuIntervalId = setInterval(() => this.cycleCPUTargetHZ(this.cpuInterval), this.cpuInterval);
         setInterval(() => document.getElementById('cpu-hz').innerText = `${this.actualHZ} Hz`, 6000);
-        setInterval(() => this.render(), 1000 / 60);
-        //this.renderIntervalId = setInterval(() => this.render(), REFRESH_INTERVAL);
+        this.renderIntervalId = setInterval(() => this.render(), REFRESH_INTERVAL);
     }
 
     cycleCPUTargetHZ(ms) {
@@ -38,7 +43,7 @@ export class EmulatorContext {
         if (this.cpuStartedAt == null)
             this.cpuStartedAt = performance.now();
 
-        this.cycleCPU(CPU_CLOCK_HZ / n)
+        this.cycleCPU((CPU_CLOCK_HZ / n));
     }
 
     cycleCPU(cycles) {
@@ -59,19 +64,22 @@ export class EmulatorContext {
     }
 
     render() {
+        const start = performance.now();
 
         const NUM_PIXELS = 184320;
 
         var bytes = this.emulator.render();
-        let canvas = this.canvas;
 
-        canvas.width = 256 * 3;
-        canvas.height = 240 * 3;
+        let canvas = this.canvas;
 
         let context = canvas.getContext('2d');
 
         for (let p = 0; p < (240 * 256); p++) {
             let i = p * 3;
+
+            if (bytes[i] === this.lastBytes[i] && bytes[i + 1] === this.lastBytes[i + 1] && bytes[i + 2] === this.lastBytes[i + 2]) {
+                continue;
+            }
 
             let [b, g, r] = [bytes[i], bytes[i + 1], bytes[i + 2]];
 
@@ -82,6 +90,10 @@ export class EmulatorContext {
 
             context.fillRect(x * 3, y * 3, 3, 3);
         }
+
+        this.lastBytes = bytes;
+
+        console.log((performance.now() - start) + ' refresh');
 
         this.renderCount = Number(this.renderCount) + 1;
 

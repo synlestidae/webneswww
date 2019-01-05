@@ -6,7 +6,7 @@ use input::*;
 use time;
 
 pub struct Emulator {
-    cpu: Cpu<MemMap>,
+    pub cpu: Cpu<MemMap>,
     gfx: Gfx,
     last_time: f64,
     frames: usize,

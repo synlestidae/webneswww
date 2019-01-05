@@ -63,8 +63,8 @@ impl JSEmulator {
         self.emulator.step()
     }
 
-    pub fn render(&self) -> Vec<u8> {
-        self.emulator.bgr_pixels().into_iter().map(|&b| b).collect()
+    pub fn render(&mut self) -> [u8; 184320] {
+        *self.emulator.cpu.mem.ppu.screen
     }
 
     pub fn input_keycode(&mut self, key: i32, is_down: bool) {
