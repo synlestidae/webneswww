@@ -59,12 +59,16 @@ impl JSEmulator {
         JSEmulator {  emulator: Emulator::new(memmap, gfx) }
     }
 
-    pub fn step(&mut self) {
-        self.emulator.step()
+    pub fn step(&mut self) -> i32 {
+        let step1 = self.emulator.cpu.cy;
+
+        self.emulator.step();
+
+        (self.emulator.cpu.cy - step1) as i32
     }
 
-    pub fn render(&mut self) -> [u8; 184320] {
-        *self.emulator.cpu.mem.ppu.screen
+    pub fn render(&mut self) -> Vec<u8> {
+        self.emulator.cpu.mem.ppu.screen.iter().cloned().collect()
     }
 
     pub fn input_keycode(&mut self, key: i32, is_down: bool) {

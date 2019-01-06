@@ -1,8 +1,8 @@
 import * as wasm from "../pkg/webnes";
 
-const CPU_CLOCK_HZ = (0.88 * 1e6)
+const CPU_CLOCK_HZ = (1.78 * 1e6)
 
-const CPU_INTERVAL = 1000 / 10;
+const CPU_INTERVAL = 1000 / 60;
 
 const REFRESH_INTERVAL = 16;
 
@@ -47,12 +47,13 @@ export class EmulatorContext {
     }
 
     cycleCPU(cycles) {
-        for (let i = 0; i < cycles; i++) {
-            this.emulator.step();
-            this.cycles++;
+        let totalCycles = 0;
+
+        while (totalCycles < cycles) {
+            totalCycles += this.emulator.step();
         }
 
-        //this.render();
+        //console.log('cycles', totalCycles);
     }
 
     keyDown(keyCode) {
@@ -92,8 +93,6 @@ export class EmulatorContext {
         }
 
         this.lastBytes = bytes;
-
-        console.log((performance.now() - start) + ' refresh');
 
         this.renderCount = Number(this.renderCount) + 1;
 
@@ -140,13 +139,11 @@ function init() {
 }
 
 function onKeyDown(e) {
-    console.log('Key!', e.keyCode, e);
     emulator && emulator.keyDown(e.keyCode, true);
     emulator && emulator.cycleCPU(1000);
 }
 
 function onKeyUp(e) {
-    console.log('Bee!', e.keyCode, e);
     if (emulator) {
         emulator.keyUp(e.keyCode, false);
         emulator.cycleCPU(1000);
