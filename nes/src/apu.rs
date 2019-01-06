@@ -4,14 +4,13 @@
 // Author: Patrick Walton
 //
 
-use audio::{self, OutputBuffer};
+use audio::{self, OutputBuffer, SAMPLE_COUNT as OUT_SAMPLE_COUNT};
 use mem::Mem;
-use resampler::Resampler;
+//use speex::Resampler;
 use util::{Save, Xorshift};
 
 use std::fs::File;
 use std::ops::{Deref, DerefMut};
-use web_sys;
 
 const CYCLES_PER_EVEN_TICK: u64 = 7438;
 const CYCLES_PER_ODD_TICK: u64 = 7439;
@@ -400,17 +399,17 @@ impl Save for Regs {
 const SAMPLE_COUNT: usize = 178992;
 
 struct SampleBuffer {
-    samples: [i16; SAMPLE_COUNT],
+    samples: Box<[i16; SAMPLE_COUNT]>,
 }
 
 /// APU state
 pub struct Apu {
     regs: Regs,
 
-    /*sample_buffers: Box<[SampleBuffer; 5]>,
+    sample_buffers: Box<[SampleBuffer; 5]>,
     sample_buffer_offset: usize,
-    output_buffer: Option<*mut OutputBuffer>,
-    resampler: Resampler,*/
+    output_buffer: Option<OutputBuffer>,
+    resampler: Resampler,
 
     pub cy: u64,
     pub ticks: u64,
@@ -437,29 +436,38 @@ impl Mem for Apu {
     }
 }
 
-
-
-// A macro to provide `println!(..)`-style syntax for `console.log` logging.
-macro_rules! log {
-    ( $( $t:tt )* ) => {
-        web_sys::console::log_1(&format!( $( $t )* ).into());
-    }
-}
-
 impl Apu {
-    pub fn new() -> Apu {
-        //let output_buffer = None;
-        log!("Thank you come again");
-
-        let regs = Regs {
-            pulses: [ ApuPulse::new(), ApuPulse::new() ],
-            triangle: ApuTriangle::new(),
-            noise: ApuNoise::new(),
-            status: ApuStatus(0),
-        };
-
+    pub fn new(output_buffer: Option<OutputBuffer>) -> Apu {
         Apu {
-            regs: regs,
+            regs: Regs {
+                pulses: [ ApuPulse::new(), ApuPulse::new() ],
+                triangle: ApuTriangle::new(),
+                noise: ApuNoise::new(),
+                status: ApuStatus(0),
+            },
+
+            sample_buffers: Box::new([
+                SampleBuffer {
+                    samples: Box::new([ 0; SAMPLE_COUNT ])
+                },
+                SampleBuffer {
+                    samples: Box::new([ 0; SAMPLE_COUNT ])
+                },
+                SampleBuffer {
+                    samples: Box::new([ 0; SAMPLE_COUNT ])
+                },
+                SampleBuffer {
+                    samples: Box::new([ 0; SAMPLE_COUNT ])
+                },
+                SampleBuffer {
+                    samples: Box::new([ 0; SAMPLE_COUNT ])
+                },
+            ]),
+
+            sample_buffer_offset: 0,
+            output_buffer: output_buffer,
+            resampler: Resampler::new(NES_SAMPLE_RATE, OUTPUT_SAMPLE_RATE),
+
             cy: 0,
             ticks: 0,
         }
@@ -569,11 +577,11 @@ impl Apu {
         self.regs.noise.envelope.tick();
 
         // Fill the sample buffers.
-        /*self.play_pulse(0, 0);
+        self.play_pulse(0, 0);
         self.play_pulse(1, 1);
         self.play_triangle(2);
-        self.play_noise(3);*/
-        //self.sample_buffer_offset += NES_SAMPLES_PER_TICK as usize;
+        self.play_noise(3);
+        self.sample_buffer_offset += NES_SAMPLES_PER_TICK as usize;
 
         // TODO: 60 Hz IRQ.
 
@@ -598,9 +606,9 @@ impl Apu {
     }
 
     fn play_pulse(&mut self, pulse_number: usize, channel: usize) {
-        /*let pulse = &mut self.regs.pulses[pulse_number];
+        let pulse = &mut self.regs.pulses[pulse_number];
         let audible = pulse.envelope.audible() && pulse.timer.audible();
-        let buffer_opt = Apu::get_or_zero_sample_buffer(&mut self.sample_buffers[channel].samples,
+        let buffer_opt = Apu::get_or_zero_sample_buffer(&mut *(self.sample_buffers[channel].samples),
                                                         self.sample_buffer_offset,
                                                         audible);
         match buffer_opt {
@@ -631,12 +639,12 @@ impl Apu {
                 pulse.waveform_index = waveform_index;
                 pulse.timer.wavelen_count = wavelen_count;
             }
-        }*/
+        }
     }
 
     fn play_triangle(&mut self, channel: usize) {
-        /*let triangle = &mut self.regs.triangle;
-        let buffer_opt = Apu::get_or_zero_sample_buffer(&mut self.sample_buffers[channel].samples,
+        let triangle = &mut self.regs.triangle;
+        let buffer_opt = Apu::get_or_zero_sample_buffer(&mut *(self.sample_buffers[channel].samples),
                                                         self.sample_buffer_offset,
                                                         triangle.audible());
         match buffer_opt {
@@ -660,12 +668,12 @@ impl Apu {
                 triangle.waveform_index = waveform_index;
                 triangle.timer.wavelen_count = wavelen_count;
             }
-        }*/
+        }
     }
 
     fn play_noise(&mut self, channel: usize) {
-        /*let noise = &mut self.regs.noise;
-        let buffer_opt = Apu::get_or_zero_sample_buffer(&mut self.sample_buffers[channel].samples,
+        let noise = &mut self.regs.noise;
+        let buffer_opt = Apu::get_or_zero_sample_buffer(&mut *(self.sample_buffers[channel].samples),
                                                         self.sample_buffer_offset,
                                                         noise.envelope.audible());
         match buffer_opt {
@@ -690,12 +698,12 @@ impl Apu {
                 noise.timer_count = timer_count;
                 noise.rng = rng;
             }
-        }*/
+        }
     }
 
     // Resamples and flushes channel buffers to the audio output device if necessary.
     pub fn play_channels(&mut self) {
-        /*let sample_buffer_length = self.sample_buffers[0].samples.len();
+        let sample_buffer_length = self.sample_buffers[0].samples.len();
         if self.sample_buffer_offset < sample_buffer_length {
             return;
         }
@@ -722,24 +730,42 @@ impl Apu {
         if self.output_buffer.is_none() {
             return;
         }
-        let output_buffer = self.output_buffer.unwrap();
 
-        // Wait for the audio callback to catch up if necessary.
+        /*// Wait for the audio callback to catch up if necessary.
         loop {
             unsafe {
                 let lock = audio::AUDIO_MUTEX.lock().unwrap();
-                let _lock = audio::AUDIO_CONDVAR.wait(lock).unwrap();
-                if (*output_buffer).play_offset == (*output_buffer).samples.len() {
+                //let _lock = audio::AUDIO_CONDVAR.wait(lock).unwrap();
+                if output_buffer.play_offset == output_buffer.samples.len() {
                     break
                 }
             }
         }
+        */
         //let _lock = audio::lock();
-        unsafe {
+        //unsafe {
             // Resample and output the audio.
-            let _ = self.resampler.process(&mut self.sample_buffers[0].samples,
-                                           &mut (*output_buffer).samples);
-            (*output_buffer).play_offset = 0;
-        }*/
+            //
+        //let output_buffer = self.output_buffer.unwrap();
+        match self.output_buffer {
+            Some(ref mut output_buffer) => {
+                self.resampler.process(&mut self.sample_buffers[0].samples, &mut (output_buffer).samples);
+                (output_buffer).play_offset = 0;
+            },
+            None => {}
+        }
+    }
+}
+
+pub struct Resampler {
+}
+
+impl Resampler {
+    pub fn new(in_sample_rate: u32, out_sample_rate: u32) -> Self {
+        Self {}
+    }
+
+    pub fn process(&mut self, sample_in: &mut [i16; SAMPLE_COUNT], sample_out: &mut [u8; OUT_SAMPLE_COUNT]) {
+
     }
 }

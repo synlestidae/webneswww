@@ -7,40 +7,58 @@
 // TODO: This module is very unsafe. Adding a reader-writer audio lock to SDL would help make it
 // safe.
 
+//use sdl2::audio::{AudioDevice, AudioCallback, AudioSpecDesired, AudioDeviceLockGuard};
 use std::cmp;
 use std::mem;
 use std::slice::from_raw_parts_mut;
 use std::sync::{Mutex, Condvar};
-
-//
-// The audio callback
-//
-
-const SAMPLE_COUNT: usize = 4410 * 2;
-
-//static mut g_audio_device: Option<*mut AudioDevice<NesAudioCallback>> = None;
-
-static mut g_output_buffer: Option<*mut OutputBuffer> = None;
-
-lazy_static! {
-    pub static ref AUDIO_MUTEX: Mutex<()> = Mutex::new(());
-    pub static ref AUDIO_CONDVAR: Condvar = Condvar::new();
-}
 
 pub struct OutputBuffer {
     pub samples: [u8; SAMPLE_COUNT],
     pub play_offset: usize,
 }
 
-pub struct NesAudioCallback;
+impl OutputBuffer {
+    pub fn new() -> Self {
+        OutputBuffer {
+            samples: [0; SAMPLE_COUNT],
+            play_offset: 0
+        }
+    }
+}
 
-/*impl AudioCallback for NesAudioCallback {
+//
+// The audio callback
+//
+
+pub const SAMPLE_COUNT: usize = 4410 * 2;
+
+//static mut g_audio_device: Option<*mut AudioDevice<NesAudioCallback>> = None;
+
+//static mut g_output_buffer: Option<*mut OutputBuffer> = None;
+
+lazy_static! {
+    pub static ref AUDIO_MUTEX: Mutex<()> = Mutex::new(());
+    pub static ref AUDIO_CONDVAR: Condvar = Condvar::new();
+}
+
+pub struct NesAudioCallback {
+    g_output_buffer: OutputBuffer
+}
+
+pub trait AudioCallback {
+    type Channel;
+
+    fn callback(&mut self, buf: &mut [Self::Channel]);
+}
+
+impl AudioCallback for NesAudioCallback {
     type Channel = i16;
 
     fn callback(&mut self, buf: &mut [Self::Channel]) {
-        unsafe {
-            let samples: &mut [u8] = from_raw_parts_mut(&mut buf[0] as *mut i16 as *mut u8, buf.len() * 2);
-            let output_buffer: &mut OutputBuffer = mem::transmute(g_output_buffer.unwrap());
+        //unsafe {
+            /*let samples: &mut [u8] = from_raw_parts_mut(&mut buf[0] as *mut i16 as *mut u8, buf.len() * 2);
+            let output_buffer: &mut OutputBuffer = &mut self.g_output_buffer;//mem::transmute(g_output_buffer.unwrap());
             let play_offset = output_buffer.play_offset;
             let output_buffer_len = output_buffer.samples.len();
 
@@ -49,19 +67,20 @@ pub struct NesAudioCallback;
                     break;
                 }
                 samples[i] = output_buffer.samples[i + play_offset];
-            }
+            }*/
 
-            let _ = AUDIO_MUTEX.lock();
-            output_buffer.play_offset = cmp::min(play_offset + samples.len(), output_buffer_len);
-            AUDIO_CONDVAR.notify_one();
-        }
+            //let _ = AUDIO_MUTEX.lock();
+            //output_buffer.play_offset = cmp::min(play_offset + samples.len(), output_buffer_len);
+            //AUDIO_CONDVAR.notify_one();
+        //}
     }
-}*/
+}
 
 /// Audio initialization. If successful, returns a pointer to an allocated `OutputBuffer` that can
-/// be filled with raw audio data. 
+/// be filled with raw audio data.
 pub fn open() -> Option<*mut OutputBuffer> {
-    let output_buffer = Box::new(OutputBuffer {
+    unimplemented!()
+    /*let output_buffer = Box::new(OutputBuffer {
         samples: [ 0; SAMPLE_COUNT ],
         play_offset: 0,
     });
@@ -70,11 +89,11 @@ pub fn open() -> Option<*mut OutputBuffer> {
     };
 
     unsafe {
+        g_output_buffer = Some(output_buffer_ptr);
         mem::forget(output_buffer);
-        Some(output_buffer_ptr)
     }
 
-    /*let spec = AudioSpecDesired {
+    let spec = AudioSpecDesired {
         freq: Some(44100),
         channels: Some(1),
         samples: Some(4410),
@@ -99,9 +118,8 @@ pub fn open() -> Option<*mut OutputBuffer> {
 // Audio tear-down
 //
 
-/*
 pub fn close() {
-    unsafe {
+    /*unsafe {
         match g_audio_device {
             None => {}
             Some(ptr) => {
@@ -109,10 +127,11 @@ pub fn close() {
                 g_audio_device = None;
             }
         }
-    }
+    }*/
+    unimplemented!()
 }
 
-pub fn lock<'a>() -> Option<AudioDeviceLockGuard<'a, NesAudioCallback>> {
+/*pub fn lock<'a>() -> Option<AudioDeviceLockGuard<'a, NesAudioCallback>> {
     unsafe {
         g_audio_device.map(|dev| (*dev).lock())
     }

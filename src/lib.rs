@@ -15,6 +15,7 @@ use nes::ppu::*;
 use nes::mapper;
 use nes::audio;
 use nes::gfx::Scale;
+use nes::audio::OutputBuffer;
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -53,7 +54,9 @@ impl JSEmulator {
         let mapper = Rc::new(RefCell::new(mapper));
         let ppu = Ppu::new(Vram::new(mapper.clone()), Oam::new());
 
-        let apu = Apu::new();
+        let buffer = OutputBuffer::new();
+
+        let apu = Apu::new(Some(buffer));
         let memmap = MemMap::new(ppu, Input::new(), mapper, apu);
 
         JSEmulator {  emulator: Emulator::new(memmap, gfx) }
